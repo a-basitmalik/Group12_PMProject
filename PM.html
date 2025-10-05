@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Standards Explorer</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>📘 Project Standards Explorer</h1>
+        <p>Discover, compare, and visualize engineering standards.</p>
+    </header>
+
+    <main>
+        <section id="search-section">
+            <input id="standardInput" type="text" placeholder="Enter standard name (e.g., ISO 9001)">
+            <button id="searchBtn">Search</button>
+        </section>
+
+        <section id="output-section">
+            <div id="result"></div>
+        </section>
+
+        <section id="compare-section">
+            <h2>Compare Standards</h2>
+            <input id="standard1" type="text" placeholder="Standard 1 (e.g., ISO 9001)">
+            <input id="standard2" type="text" placeholder="Standard 2 (e.g., ISO 14001)">
+            <button id="compareBtn">Compare</button>
+            <div id="comparisonResult"></div>
+        </section>
+
+        <section id="generate-section">
+            <h2>Generate Project Process</h2>
+            <input id="projectType" type="text" placeholder="Enter project type (e.g., software, civil)">
+            <button id="generateBtn">Generate</button>
+            <div id="processResult"></div>
+        </section>
+
+        <section id="book-section">
+            <h2>Book Search</h2>
+            <input id="bookName" type="text" placeholder="Enter book title">
+            <button id="bookBtn">Search Book</button>
+            <div id="bookResult"></div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Developed by Team Explorer © 2025</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
