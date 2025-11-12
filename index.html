@@ -1503,3 +1503,880 @@
         });
       });
     }
+
+    function findSnippet(text, q, n=100) {
+      if (!text || !q) return short(text, n * 2);
+      const qLower = q.toLowerCase();
+      const tLower = text.toLowerCase();
+      let index = tLower.indexOf(qLower);
+      if (index === -1) return short(text, n * 2);
+      const start = Math.max(0, index - n);
+      const end = Math.min(text.length, index + q.length + n);
+      let snippet = text.slice(start, end);
+      if (start > 0) snippet = '... ' + snippet;
+      if (end < text.length) snippet = snippet + ' ...';
+      return snippet.replace(new RegExp(escapeRegExp(q),'gi'), m=>`[${m}]`);
+    }
+
+    // ========== Bookmarks Functionality ==========
+    function loadBookmarks() { 
+      return JSON.parse(localStorage.getItem(state.bookmarksKey) || '[]'); 
+    }
+    
+    function saveBookmarks(arr) { 
+      localStorage.setItem(state.bookmarksKey, JSON.stringify(arr)); 
+    }
+    
+    function addBookmark(title, docId, page, excerpt, highlightRange) {
+      const arr = loadBookmarks();
+      const url = new URL(location.href);
+      url.searchParams.set('doc', docId);
+      url.searchParams.set('page', page);
+      if(excerpt) url.searchParams.set('q', excerpt);
+      if(highlightRange && typeof highlightRange.start === 'number') url.searchParams.set('start', highlightRange.start);
+      if(highlightRange && typeof highlightRange.end === 'number') url.searchParams.set('end', highlightRange.end);
+      
+      arr.push({ 
+        id: uid('bm'), 
+        title, 
+        docId, 
+        page, 
+        excerpt: short(excerpt, 80), 
+        link: url.toString() 
+      });
+      
+      saveBookmarks(arr);
+      renderBookmarks();
+      updateStats();
+    }
+
+    document.getElementById('bookmarkBtn').addEventListener('click', () => {
+      if(!state.currentDocId) {
+        alert('Open a document first.');
+        return;
+      }
+      
+      const pageText = state.docs[state.currentDocId].pages.find(p => p.page === state.currentPageIndex)?.text;
+      if(!pageText) {
+        alert('Could not find page content.');
+        return;
+      }
+      
+      let title = prompt('Enter a title for this bookmark (optional):');
+      if(title === null) return;
+      
+      let selection = window.getSelection().toString().trim();
+      let highlightRange = null;
+      
+      if(selection){
+        let start = pageText.indexOf(selection);
+        if(start>=0) highlightRange = {start, end: start+selection.length};
+        if(!title) title = short(selection, 40);
+      }
+      
+      addBookmark(
+        title || state.docs[state.currentDocId].name, 
+        state.currentDocId, 
+        state.currentPageIndex, 
+        selection || null, 
+        highlightRange
+      );
+      
+      alert('View bookmarked!');
+    });
+
+    document.getElementById('copyDeepLink').addEventListener('click', () => {
+      if(!state.currentDocId) {
+        alert('Open a document first.');
+        return;
+      }
+      
+      let q = null, start = null, end = null;
+      const selection = window.getSelection().toString().trim();
+      
+      if(selection){
+        const pageText = state.docs[state.currentDocId].pages.find(p => p.page === state.currentPageIndex)?.text;
+        if(pageText){
+          const idx = pageText.indexOf(selection);
+          if(idx>=0){ 
+            q = selection; 
+            start = idx; 
+            end = idx + selection.length; 
+          }
+        }
+      }
+      
+      const url = new URL(location.href);
+      url.searchParams.set('doc', state.currentDocId);
+      url.searchParams.set('page', state.currentPageIndex);
+      if(q) url.searchParams.set('q', q);
+      if(typeof start === 'number') url.searchParams.set('start', start);
+      if(typeof end === 'number') url.searchParams.set('end', end);
+      
+      navigator.clipboard.writeText(url.toString()).then(() => {
+        alert('Deep link copied to clipboard.');
+      });
+    });
+
+    function renderBookmarks() {
+      const list = loadBookmarks();
+      const el = document.getElementById('bookmarksList');
+      el.innerHTML = '';
+      
+      if(list.length === 0){ 
+        el.innerHTML = '<div class="text-muted text-center py-4">No bookmarks saved yet</div>'; 
+        return; 
+      }
+      
+      list.forEach(b => {
+        const d = state.docs[b.docId] ? state.docs[b.docId].name : b.docId;
+        const row = document.createElement('div');
+        row.className = 'result-item';
+        row.innerHTML = `
+          <div class="result-title">${escapeHtml(b.title || d)}</div>
+          <div class="result-meta">${d} • page ${b.page}</div>
+          <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-outline" data-link="${b.link}">Open</button>
+            <button class="btn btn-outline" data-id="${b.id}">Delete</button>
+          </div>
+        `;
+        
+        row.querySelectorAll('button')[0].onclick = () => {
+          const url = new URL(b.link, location.href);
+          const doc = url.searchParams.get('doc') || url.hash.split('&').find(s => s.startsWith('doc='))?.split('=')[1];
+          const page = parseInt(url.searchParams.get('page') || 1);
+          const q = url.searchParams.get('q') || (url.hash.startsWith('#q=') ? decodeURIComponent(url.hash.slice(3)) : null);
+          const start = url.searchParams.get('start') ? parseInt(url.searchParams.get('start')) : undefined;
+          const end = url.searchParams.get('end') ? parseInt(url.searchParams.get('end')) : undefined;
+
+          if(doc) {
+            document.querySelector('.nav-item[data-page="viewer"]').click();
+            openDoc(doc, page, q ? {q, start, end} : null);
+          }
+        };
+        
+        row.querySelectorAll('button')[1].onclick = () => {
+          const arr = loadBookmarks().filter(x => x.id !== b.id);
+          saveBookmarks(arr);
+          renderBookmarks();
+          updateStats();
+        };
+        
+        el.appendChild(row);
+      });
+    }
+
+    document.getElementById('clearBookmarks').addEventListener('click', () => { 
+      if(confirm('Clear all bookmarks?')) { 
+        saveBookmarks([]); 
+        renderBookmarks(); 
+        updateStats();
+      } 
+    });
+
+    document.getElementById('exportBookmarks').addEventListener('click', () => { 
+      const data = JSON.stringify(loadBookmarks(), null, 2); 
+      downloadData('pm_bookmarks.json', data, 'application/json'); 
+    });
+
+    document.getElementById('importBookmarks').addEventListener('click', () => {
+      const inp = document.createElement('input'); 
+      inp.type = 'file'; 
+      inp.accept = 'application/json';
+      inp.onchange = async () => {
+        const f = inp.files[0]; 
+        if(!f) return;
+        const text = await f.text();
+        try { 
+          const arr = JSON.parse(text); 
+          saveBookmarks(arr); 
+          renderBookmarks(); 
+          updateStats();
+          alert('Imported bookmarks.'); 
+        }
+        catch(e){ alert('Invalid JSON'); }
+      }; 
+      inp.click();
+    });
+
+    // ========== Comparison Functionality ==========
+    function setSelectionA(sel) {
+      state.selectedA = sel;
+      document.getElementById('compareA').innerHTML = `
+        <div class="text-primary"><strong>A:</strong> ${state.docs[sel.docId]?.name || sel.docId} • page ${sel.pageNum}</div>
+        <div class="mt-2">${short(sel.excerpt,300)}</div>
+      `;
+      updateSelectionPreview();
+    }
+
+    function setSelectionB(sel) {
+      state.selectedB = sel;
+      document.getElementById('compareB').innerHTML = `
+        <div class="text-primary"><strong>B:</strong> ${state.docs[sel.docId]?.name || sel.docId} • page ${sel.pageNum}</div>
+        <div class="mt-2">${short(sel.excerpt,300)}</div>
+      `;
+      updateSelectionPreview();
+    }
+
+    function updateSelectionPreview() {
+      const p = document.getElementById('selectionPreview');
+      p.innerHTML = `
+        <div><strong>A</strong>: ${state.selectedA ? (state.docs[state.selectedA.docId]?.name + ' page ' + state.selectedA.pageNum) : '—'}</div>
+        <div><strong>B</strong>: ${state.selectedB ? (state.docs[state.selectedB.docId]?.name + ' page ' + state.selectedB.pageNum) : '—'}</div>
+      `;
+    }
+
+    document.getElementById('setA').addEventListener('click', () => {
+      if(!state.currentDocId) {
+        alert('Open a document in the viewer to set as A.');
+        return;
+      }
+      
+      const page = state.docs[state.currentDocId].pages.find(p => p.page === state.currentPageIndex);
+      const excerpt = page?.text?.slice(0,300) || '';
+      const selectionText = window.getSelection().toString().trim();
+      
+      if (selectionText) {
+        const startIdx = page?.text?.indexOf(selectionText) || -1;
+        if (startIdx >= 0) {
+          return setSelectionA({
+            docId: state.currentDocId, 
+            pageNum: state.currentPageIndex, 
+            excerpt: selectionText, 
+            q: selectionText.split(' ').slice(0,6).join(' ')
+          });
+        }
+      }
+      
+      setSelectionA({
+        docId: state.currentDocId, 
+        pageNum: state.currentPageIndex, 
+        excerpt, 
+        q: excerpt.split(' ').slice(0,6).join(' ')
+      });
+    });
+
+    document.getElementById('setB').addEventListener('click', () => {
+      if(!state.currentDocId) {
+        alert('Open a document in the viewer to set as B.');
+        return;
+      }
+      
+      const page = state.docs[state.currentDocId].pages.find(p => p.page === state.currentPageIndex);
+      const excerpt = page?.text?.slice(0,300) || '';
+      const selectionText = window.getSelection().toString().trim();
+      
+      if (selectionText) {
+        const startIdx = page?.text?.indexOf(selectionText) || -1;
+        if (startIdx >= 0) {
+          return setSelectionB({
+            docId: state.currentDocId, 
+            pageNum: state.currentPageIndex, 
+            excerpt: selectionText, 
+            q: selectionText.split(' ').slice(0,6).join(' ')
+          });
+        }
+      }
+      
+      setSelectionB({
+        docId: state.currentDocId, 
+        pageNum: state.currentPageIndex, 
+        excerpt, 
+        q: excerpt.split(' ').slice(0,6).join(' ')
+      });
+    });
+
+    document.getElementById('compareBtn').addEventListener('click', () => {
+      if(!state.selectedA || !state.selectedB) {
+        alert('Please set both A and B before comparing');
+        return;
+      }
+      doCompare();
+    });
+
+    document.getElementById('openCompareLink').addEventListener('click', () => {
+      if(state.selectedA){
+        const A = state.selectedA;
+        document.querySelector('.nav-item[data-page="viewer"]').click();
+        openDoc(A.docId, A.pageNum, {q: A.q});
+      } else {
+        alert('Select A first.');
+      }
+    });
+
+    function doCompare(){
+      const A = state.selectedA, B = state.selectedB;
+      if(!A || !B) return;
+      
+      const textA = state.docs[A.docId].pages.find(p => p.page === A.pageNum).text || '';
+      const textB = state.docs[B.docId].pages.find(p => p.page === B.pageNum).text || '';
+      const common = findCommonPhrases(textA, textB, 4);
+
+      const aEl = document.getElementById('compareA');
+      const bEl = document.getElementById('compareB');
+
+      const Aname = state.docs[A.docId].name;
+      const Bname = state.docs[B.docId].name;
+      
+      aEl.innerHTML = `<div class="text-primary"><strong>A: ${Aname} — page ${A.pageNum}</strong></div><div class="mt-2">${highlightMany(textA, common, 'red')}</div>`;
+      bEl.innerHTML = `<div class="text-primary"><strong>B: ${Bname} — page ${B.pageNum}</strong></div><div class="mt-2">${highlightMany(textB, common, 'red')}</div>`;
+
+      // Insights based on comparison
+      const [diffA, diffB] = findUniquePhrases(textA, textB, 6);
+      const similarities = common.slice(0,6);
+      const uniqueA = diffA.slice(0,6);
+      const uniqueB = diffB.slice(0,6);
+      const out = document.getElementById('insightsPanel');
+
+      // Add Top Unique Terms for richer insight
+      const topUniqueA = topUniqueTerms(textA, textB, 5);
+      const topUniqueB = topUniqueTerms(textB, textA, 5);
+
+      out.innerHTML = `
+        <div class="mb-3"><strong>Similarity Summary (Common phrases)</strong>
+          <div class="mt-1">${similarities.length ? similarities.map(s => `• ${escapeHtml(short(s,80))}`).join('<br>') : 'No large exact-phrase overlaps detected; consider adjusting search terms.'}</div>
+        </div>
+        <div class="mb-3"><strong>Unique Focus in ${escapeHtml(Aname)}</strong>
+          <div class="mt-1">
+            ${uniqueA.map(s => `• ${escapeHtml(short(s,80))}`).join('<br>')}
+            <div class="mt-2"><em>Top Unique Terms:</em> ${topUniqueA.length ? topUniqueA.join(', ') : '—'}</div>
+          </div>
+        </div>
+        <div><strong>Unique Focus in ${escapeHtml(Bname)}</strong>
+          <div class="mt-1">
+            ${uniqueB.map(s => `• ${escapeHtml(short(s,80))}`).join('<br>')}
+            <div class="mt-2"><em>Top Unique Terms:</em> ${topUniqueB.length ? topUniqueB.join(', ') : '—'}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function findCommonPhrases(text1, text2, minLength=4) {
+      const common = new Set();
+      const words1 = text1.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>0);
+      const words2 = text2.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>0);
+      
+      for(let len = 6; len >= minLength; len--){
+        const phrases1 = new Set();
+        for(let i=0; i<=words1.length-len; i++){ 
+          phrases1.add(words1.slice(i, i+len).join(' ')); 
+        }
+        
+        for(let i=0; i<=words2.length-len; i++){
+          const phrase = words2.slice(i, i+len).join(' ');
+          if(phrases1.has(phrase) && !Array.from(common).some(c=>c.includes(phrase))){
+            common.add(phrase);
+          }
+        }
+      }
+      
+      return Array.from(common);
+    }
+
+    function highlightMany(text, phrases, color='mark') {
+      let html = escapeHtml(text);
+      phrases.sort((a,b) => b.length - a.length);
+      
+      phrases.forEach(p => {
+        const escapedP = escapeRegExp(escapeHtml(p));
+        html = html.replace(new RegExp(escapedP, 'gi'), m => `<mark>${m}</mark>`);
+      });
+      
+      return html;
+    }
+
+    function findUniquePhrases(text1, text2, len=6) {
+      const words1 = text1.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>0);
+      const words2 = text2.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>0);
+      
+      const phrases2 = new Set();
+      for(let i=0; i<=words2.length-len; i++){ 
+        phrases2.add(words2.slice(i, i+len).join(' ')); 
+      }
+      
+      const unique1 = new Set();
+      for(let i=0; i<=words1.length-len; i++){
+        const phrase = words1.slice(i, i+len).join(' ');
+        if(!phrases2.has(phrase) && !Array.from(unique1).some(u=>u.includes(phrase))){
+          unique1.add(phrase);
+        }
+      }
+
+      const phrases1 = new Set();
+      for(let i=0; i<=words1.length-len; i++){ 
+        phrases1.add(words1.slice(i, i+len).join(' ')); 
+      }
+      
+      const unique2 = new Set();
+      for(let i=0; i<=words2.length-len; i++){
+        const phrase = words2.slice(i, i+len).join(' ');
+        if(!phrases1.has(phrase) && !Array.from(unique2).some(u=>u.includes(phrase))){
+          unique2.add(phrase);
+        }
+      }
+
+      return [Array.from(unique1), Array.from(unique2)];
+    }
+
+    function topUniqueTerms(text, otherText, n=8){
+      const t = text.toLowerCase().replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(w=>w.length>3);
+      const o = new Set((otherText||'').toLowerCase().split(/\s+/));
+      const freq = {};
+      
+      t.forEach(w => { 
+        if(!o.has(w)) freq[w] = (freq[w]||0) + 1; 
+      });
+      
+      const arr = Object.entries(freq).sort((a,b) => b[1]-a[1]).map(x=>x[0]);
+      return arr.slice(0,n);
+    }
+
+    document.getElementById('computeInsights').addEventListener('click', () => {
+      if(state.selectedA && state.selectedB) { 
+        doCompare(); 
+        return; 
+      }
+      
+      const docKeys = Object.keys(state.docs);
+      if(docKeys.length < 2) {
+        alert('Upload at least two standards to compute insights.');
+        return;
+      }
+      
+      const d0 = state.docs[docKeys[0]];
+      const d1 = state.docs[docKeys[1]];
+      const t0 = d0.pages.map(p=>p.text).join(' ');
+      const t1 = d1.pages.map(p=>p.text).join(' ');
+      const common = findCommonPhrases(t0,t1,4).slice(0,15);
+      const out = document.getElementById('insightsPanel');
+
+      const [diffA, diffB] = findUniquePhrases(t0, t1, 6);
+      const topUniqueA = topUniqueTerms(t0, t1, 5);
+      const topUniqueB = topUniqueTerms(t1, t0, 5);
+
+      out.innerHTML = `
+        <div class="mb-3"><strong>Repo-level similarities between ${escapeHtml(d0.name)} and ${escapeHtml(d1.name)}</strong>
+          <div class="mt-1">${common.length ? common.map(s => `• ${escapeHtml(short(s,110))}`).join('<br>') : 'No long-phrase similarities found.'}</div>
+        </div>
+        <div class="mb-3"><strong>Unique Focus (Phrases) in ${escapeHtml(d0.name)}</strong>
+          <div class="mt-1">${diffA.slice(0,4).map(s => `• ${escapeHtml(short(s,80))}`).join('<br>')}</div>
+          <div class="mt-2"><em>Top Unique Terms:</em> ${topUniqueA.length ? topUniqueA.join(', ') : '—'}</div>
+        </div>
+        <div><strong>Unique Focus (Phrases) in ${escapeHtml(d1.name)}</strong>
+          <div class="mt-1">${diffB.slice(0,4).map(s => `• ${escapeHtml(short(s,80))}`).join('<br>')}</div>
+          <div class="mt-2"><em>Top Unique Terms:</em> ${topUniqueB.length ? topUniqueB.join(', ') : '—'}</div>
+        </div>
+      `;
+    });
+
+    // ========== Process Generator ==========
+    document.getElementById('generateProcess').addEventListener('click', generateProcess);
+
+    function generateProcess(){
+      const projectName = (document.getElementById('projectName').value || 'Project').trim();
+      let seeds = [];
+      
+      if(state.selectedA) seeds.push(state.docs[state.selectedA.docId].pages.find(p=>p.page===state.selectedA.pageNum).text || '');
+      if(state.selectedB) seeds.push(state.docs[state.selectedB.docId].pages.find(p=>p.page===state.selectedB.pageNum).text || '');
+      
+      if(seeds.length === 0 && Object.keys(state.docs).length > 0){
+        const doc = state.docs[Object.keys(state.docs)[0]];
+        seeds.push(doc.pages.map(p=>p.text).join(' '));
+      }
+      
+      let keywords = [];
+      seeds.forEach(s => keywords.push(...topUniqueTerms(s, '', 10)));
+      keywords = [...new Set(keywords.filter(w=>w.length>4))].slice(0,8);
+
+      let phases = ['Initiation','Planning','Execution','Monitoring & Control','Closing'];
+      if(keywords.some(k=>k.includes('sprint')||k.includes('agile'))) phases = ['Initiation','Iteration Planning','Execution & Build','Review & Retrospective','Closing'];
+      if(keywords.some(k=>k.includes('stage')||k.includes('gate'))) phases = ['Concept','Definition','Development','Transition','Closure'];
+
+      const wbs = buildWBS(projectName, phases);
+      document.getElementById('wbsPreview').innerHTML = `<pre>${wbsToMarkdown(projectName, wbs)}</pre>`;
+      document.getElementById('processOutput').innerHTML = `<div>Generated WBS for <strong>${escapeHtml(projectName)}</strong> using a ${phases.length > 5 ? 'Stage-Gate' : 'Sequential'} approach (keywords: ${keywords.join(', ')}).</div>`;
+    }
+
+    function buildWBS(projectName, phases) {
+      const activitiesMap = {
+        'Initiation': ['Develop Charter','Identify Stakeholders','Define High-level Scope'],
+        'Planning': ['Develop Schedule','Estimate Costs','Define Scope/WBS','Plan Risk Management','Plan Quality'],
+        'Execution': ['Direct & Manage Project Work','Manage Stakeholder Engagement','Acquire Resources','Implement Risk Responses'],
+        'Monitoring & Control': ['Monitor Progress','Perform Integrated Change Control','Manage Risks','Validate Scope'],
+        'Closing': ['Obtain Final Acceptance','Close Contracts','Conduct Lessons Learned','Archive Project Documents'],
+        'Iteration Planning': ['Refine Backlog','Plan Sprint/Iteration','Define Acceptance Criteria'],
+        'Execution & Build': ['Design, Build, Test Iteration','Conduct Daily Stand-ups','Continuous Integration'],
+        'Review & Retrospective': ['Demo to Stakeholders','Conduct Retrospective','Adjust Backlog'],
+        'Concept': ['Business Case Approval','High-level Requirements','Feasibility Study'],
+        'Definition': ['Detailed Requirements','Design Architecture','Develop PMP'],
+        'Development': ['Execute Build/Test','Manage Suppliers','Quality Assurance'],
+        'Transition': ['User Acceptance Testing','Training & Handover','Launch'],
+        'Closure': ['Final Audit','Closeout Report','Benefit Realization Review']
+      };
+
+      return {
+        projectName,
+        phases: phases.map(p => ({
+          name: p,
+          activities: activitiesMap[p] || activitiesMap['Initiation'] // fallback to initiation activities
+        }))
+      };
+    }
+
+    function wbsToMarkdown(projectName, wbs) {
+      let out = `# WBS — ${projectName}\n\n`;
+      out += `Generated: ${new Date().toISOString()}\n\n`;
+      
+      wbs.phases.forEach((p,i) => {
+        out += `## ${i+1}. ${p.name}\n`;
+        p.activities.forEach((a,j) => {
+          out += `- ${i+1}.${j+1} ${a}\n`;
+        });
+        out += '\n';
+      });
+      
+      out += `\n---\n_This WBS was produced by the PM Standards Explorer prototype. Tailor activities as required for your project._\n`;
+      return out;
+    }
+
+    // ========== Scenarios ==========
+    const SCENARIO_TEMPLATES = {
+      software: {
+        title: 'Custom Software Development Project',
+        key: 'software',
+        context: 'Well-defined requirements, <6 months, <7 team members. Emphasize speed and flexibility.',
+        processType: 'Lightweight iterative (Agile-inspired)',
+        phases: [
+          { name: 'Initiation', activities: ['Define project vision & objectives','Identify stakeholders','High-level requirements'], roles: ['Project Sponsor','Product Owner'], artifacts: ['Project Charter','Stakeholder Register'], gates: ['Go/No-Go to planning'], refs: ['PMBOK §2.2','PMBOK §4.3','PRINCE2 Ch 2'] },
+          { name: 'Planning', activities: ['Refine backlog','Release plan (sprints)','Define acceptance criteria','Technical spike (if needed)'], roles: ['Scrum Master/Tech Lead','Product Owner'], artifacts: ['Product Backlog','Sprint Plan','Risk Log'], gates: ['Sprint 0 readiness'], refs: ['PMBOK §6','ISO 21502 §5.4'] },
+          { name: 'Execution (Iterative Delivery)', activities: ['Sprint cycles: design, build, test','Continuous integration','Demo to stakeholders'], roles: ['Development Team','QA'], artifacts: ['Increment','Test Reports','CI Build'], gates: ['Release candidate review'], refs: ['PMBOK §8','PRINCE2 Ch 6'] },
+          { name: 'Monitoring & Control', activities: ['Daily stand-ups','Burndown & metrics','Risk reviews','Change control lightweight'], roles: ['Project Manager / Scrum Master'], artifacts: ['Status Dashboard','Risk Register'], gates: ['Acceptance for release'], refs: ['PMBOK §4.4','ISO 21502 §6.3'] },
+          { name: 'Closing', activities: ['Acceptance','Handover','Retrospective','Document lessons learned'], roles: ['Project Manager','Product Owner'], artifacts: ['Acceptance Certificate','Lessons Learned'], gates: ['Formal closeout'], refs: ['PMBOK §11','PRINCE2 Ch 7'] }
+        ],
+        tailoringRationale: 'Skip heavy governance, emphasize short iterations, automate CI/CD, and keep documentation lean. Use lightweight change control and adopt frequent demos to validate requirements early.'
+      },
+      innovation: {
+        title: 'Innovative Product Development Project',
+        key: 'innovation',
+        context: 'R&D-heavy, uncertain outcomes, ~1 year duration. Emphasize discovery, stage-gates, and IP management.',
+        processType: 'Hybrid (Iterative Discovery + Stage-Gate Governance)',
+        phases: [
+          { name: 'Concept & Business Case', activities: ['Define problem space','Market/Competitor analysis','Feasibility study','Stage-gate 1: Approval to Invest'], roles: ['Innovation Lead','Product Manager'], artifacts: ['Business Case','Problem Statement'], gates: ['Concept Approval (Stage Gate 1)'], refs: ['PMBOK §2','PRINCE2 Ch 2'] },
+          { name: 'Discovery & Experimentation', activities: ['Build prototypes (MVP)','Customer feedback cycles','Iterative refinement','Define core IP'], roles: ['R&D Team','UX/Design'], artifacts: ['Prototypes','Experiment Reports','IP Register'], gates: ['Validated solution'], refs: ['ISO 21502 §5.5'] },
+          { name: 'Develop & Stabilize', activities: ['Refine product','Scale architecture','Regulatory checks','Quality assurance'], roles: ['Engineering Manager','QA','Compliance'], artifacts: ['Release Plan','QA Reports','Compliance Checklist'], gates: ['Readiness to scale'], refs: ['ISO 21500 §6','PMBOK §10'] },
+          { name: 'Monitoring & Governance', activities: ['Portfolio oversight','Benefit tracking','Risk & IP management'], roles: ['Program Manager','IP Counsel'], artifacts: ['Benefit Register','Risk Log','IP Register'], gates: ['Business case review'], refs: ['PMBOK §4','PRINCE2 Ch 5'] },
+          { name: 'Transition & Closure', activities: ['Commercialization plan','Knowledge transfer','Post-launch evaluation'], roles: ['Product Manager','Sales'], artifacts: ['Go-to-market Plan','Lessons Learned'], gates: ['Commercial launch decision'], refs: ['PMBOK §11','ISO 21502 §7'] }
+        ],
+        tailoringRationale: 'Combine stage-gate decision points for investment control with iterative discovery cycles. Emphasize experiments, define clear pivot criteria, and include IP/regulatory checks early.'
+      },
+      government: {
+        title: 'Large Government Project',
+        key: 'government',
+        context: 'Civil, electrical, and IT components, 2-year duration. Emphasize governance, compliance, procurement, and stakeholder reporting.',
+        processType: 'Predictive / Stage-based (PRINCE2-style) with strong governance',
+        phases: [
+          { name: 'Project Initiation & Governance', activities: ['Establish governance structure','Detailed business case','Stakeholder & regulatory mapping'], roles: ['Program Sponsor','Steering Committee','Project Director'], artifacts: ['Business Case','Governance Plan','Stakeholder Register'], gates: ['Authority to proceed / Funding approval'], refs: ['PRINCE2 Ch 2','PMBOK §2','ISO 21500 §5'] },
+          { name: 'Detailed Design & Procurement', activities: ['Detailed engineering design','Procurement planning & tendering','Contract packaging'], roles: ['Design Leads','Procurement','Legal'], artifacts: ['Tender Documents','Design Packages','Procurement Contracts'], gates: ['Procurement award / design sign-off'], refs: ['ISO 21502 §6','PRINCE2 Ch 7'] },
+          { name: 'Construction & Integration', activities: ['Civil works','Electrical installation','Systems integration','Factory acceptance tests'], roles: ['Construction Manager','Systems Integrator','QA'], artifacts: ['Installation Reports','Test Certificates','Integration Plan'], gates: ['Stage acceptance / handover to integration'], refs: ['PMBOK §8','ISO 21500 §6'] },
+          { name: 'Commissioning & Acceptance', activities: ['System commissioning','Compliance verification','User training and transition'], roles: ['Commissioning Lead','Compliance Officer','Training Lead'], artifacts: ['Commissioning Reports','Training Materials','Acceptance Certificates'], gates: ['Operational acceptance'], refs: ['PRINCE2 Ch 6','PMBOK §11'] },
+          { name: 'Operations Handover & Closeout', activities: ['Handover to operations','Close contracts','Post-implementation review'], roles: ['Operations Manager','Contract Manager'], artifacts: ['Handover Pack','Final Accounts','Lessons Learned'], gates: ['Final sign-off & audit'], refs: ['PMBOK §11','ISO 21500 §7'] }
+        ],
+        tailoringRationale: 'A predictive approach is required due to the scale and compliance needs. Strong, centralized governance (Steering Committee) is critical. Tailoring focuses on separating design/procurement from execution stages and adding explicit gates for compliance/audit sign-off.'
+      }
+    };
+
+    document.getElementById('generateScenarioProcess').addEventListener('click', () => {
+      const key = document.getElementById('scenarioSelect').value;
+      if(!key) {
+        alert('Select a scenario first.');
+        return;
+      }
+      
+      const template = SCENARIO_TEMPLATES[key];
+      state.scenarios[key] = JSON.parse(JSON.stringify(template));
+      renderScenarioToUI(key, template);
+      document.getElementById('scenarioOutput').innerHTML = `<div>Generated: <strong>${escapeHtml(template.title)}</strong></div>`;
+      state.lastScenarioAction = 'single';
+    });
+
+    document.getElementById('generateAllScenarios').addEventListener('click', () => {
+      for (const k of Object.keys(SCENARIO_TEMPLATES)) {
+        state.scenarios[k] = JSON.parse(JSON.stringify(SCENARIO_TEMPLATES[k]));
+      }
+
+      const firstKey = Object.keys(SCENARIO_TEMPLATES)[0];
+      document.getElementById('scenarioSelect').value = firstKey;
+
+      renderAllScenariosToUI();
+
+      document.getElementById('scenarioOutput').innerHTML =
+        `<div>Generated all 3 scenarios: <strong>Custom Software</strong>, <strong>Innovative Product</strong>, <strong>Large Government</strong>. Showing combined view below.</div>`;
+
+      state.lastScenarioAction = 'all';
+      generateAndDownloadCombinedScenarios();
+    });
+
+    function renderAllScenariosToUI() {
+      const container = document.getElementById('phase2Details');
+      const html = [];
+      
+      html.push(`<h3 class="text-primary mb-3">All Project Scenarios - Combined View</h3>`);
+      
+      Object.keys(SCENARIO_TEMPLATES).forEach((key, index) => {
+        const template = SCENARIO_TEMPLATES[key];
+        
+        html.push(`<div class="scenario-section ${index > 0 ? 'mt-4' : ''}" style="border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; background: var(--bg-surface);">`);
+        
+        html.push(`<h4 style="color: var(--primary-light); margin-bottom: 12px;">${index + 1}. ${escapeHtml(template.title)}</h4>`);
+        html.push(`<div><strong>Context:</strong> ${escapeHtml(template.context)}</div>`);
+        html.push(`<div class="mt-2"><span class="tag" style="background:rgba(67,97,238,0.1); padding:4px 8px; border-radius:4px;">${escapeHtml(template.processType)}</span></div>`);
+
+        html.push(`<h5 class="mt-3 text-primary">Phases & Activities</h5>`);
+        html.push('<table style="width:100%; border-collapse:collapse; font-size: 13px;"><thead><tr style="border-bottom:1px solid var(--border);"><th style="padding:8px; text-align:left;">Phase</th><th style="padding:8px; text-align:left;">Key Activities</th><th style="padding:8px; text-align:left;">Roles</th><th style="padding:8px; text-align:left;">Artifacts</th></tr></thead><tbody>');
+        
+        template.phases.forEach((p, i) => {
+          html.push(`<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:8px; vertical-align:top;"><strong>${i+1}. ${escapeHtml(p.name)}</strong></td>
+            <td style="padding:8px; vertical-align:top;">${escapeHtml(p.activities.join('; '))}</td>
+            <td style="padding:8px; vertical-align:top;">${escapeHtml((p.roles||[]).join(', '))}</td>
+            <td style="padding:8px; vertical-align:top;">${escapeHtml((p.artifacts||[]).join('; '))}</td>
+          </tr>`);
+        });
+        
+        html.push('</tbody></table>');
+
+        html.push(`<h5 class="mt-3 text-primary">Tailoring Justification</h5>`);
+        html.push(`<div style="font-size: 14px; line-height: 1.5;">${escapeHtml(template.tailoringRationale)}</div>`);
+
+        const refs = buildReferenceList(template);
+        html.push(`<h5 class="mt-3 text-primary">Referenced Standards</h5>`);
+        html.push(`<div>${refs.length ? refs.map(r => `<span class="tag" style="background:rgba(108,87,245,0.15); font-weight:400; font-size:12px; margin-right: 6px; margin-bottom: 4px; display: inline-block;">${escapeHtml(r)}</span>`).join('') : '—'}</div>`);
+
+        html.push(`</div>`);
+      });
+
+      container.innerHTML = html.join('');
+    }
+
+    function generateAndDownloadCombinedScenarios() {
+      let combinedMd = `# All Three Project Management Scenarios\n\n`;
+      combinedMd += `Generated: ${new Date().toISOString().split('T')[0]}\n\n`;
+      combinedMd += `This document contains tailored project management processes for three different project scenarios:\n\n`;
+
+      Object.keys(SCENARIO_TEMPLATES).forEach((key, index) => {
+        const template = SCENARIO_TEMPLATES[key];
+        
+        combinedMd += `## ${index + 1}. ${template.title}\n\n`;
+        combinedMd += `### Context & Rationale\n\n`;
+        combinedMd += `**Process Type:** ${template.processType}\n\n`;
+        combinedMd += `**Project Context:** ${template.context}\n\n`;
+        combinedMd += `**Tailoring Justification:** ${template.tailoringRationale}\n\n`;
+
+        combinedMd += `### Process Phases & Details\n\n`;
+        template.phases.forEach((p, i) => {
+          combinedMd += `#### ${i+1}. ${p.name}\n`;
+          combinedMd += `- **Key Activities:** ${p.activities.join('; ')}\n`;
+          combinedMd += `- **Roles:** ${(p.roles || []).join(', ')}\n`;
+          combinedMd += `- **Artifacts/Deliverables:** ${(p.artifacts || []).join('; ')}\n`;
+          combinedMd += `- **Decision Gates:** ${(p.gates || []).join('; ')}\n`;
+          combinedMd += `- **References:** ${(p.refs || []).join(', ')}\n\n`;
+        });
+
+        combinedMd += `### Referenced Standards\n\n`;
+        const refs = buildReferenceList(template);
+        if(refs.length){
+          refs.forEach(r => { combinedMd += `- ${r}\n`; });
+        } else {
+          combinedMd += `(No specific standards referenced in this template)\n`;
+        }
+
+        combinedMd += `\n---\n\n`;
+      });
+
+      combinedMd += `_This combined scenarios document was produced by the PM Standards Explorer prototype. Tailor processes as required for your specific project needs._\n`;
+
+      downloadData('All_Project_Scenarios.md', combinedMd, 'text/markdown;charset=utf-8');
+    }
+
+    // ========== Export Functionality ==========
+    function downloadData(filename, content, mime='text/plain'){
+      const blob = new Blob([content], {type: mime});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { 
+        URL.revokeObjectURL(url); 
+        a.remove(); 
+      }, 5000);
+    }
+
+    document.getElementById('downloadWBS').addEventListener('click', () => {
+      let md = document.getElementById('wbsPreview').textContent;
+      if(!md || md.includes('A WBS will be generated')) {
+        const defaultWBS = buildWBS('Sample Project', ['Initiation','Planning','Execution','Monitoring & Control','Closing']);
+        md = wbsToMarkdown('Sample Project', defaultWBS);
+      }
+      downloadData('Assignment1_WBS.md', md, 'text/markdown');
+    });
+
+    document.getElementById('exportInsights').addEventListener('click', () => {
+      const content = document.getElementById('insightsPanel').innerText;
+      downloadData('PM_Insights.txt', content, 'text/plain');
+    });
+
+    document.getElementById('downloadProcess').addEventListener('click', () => {
+      const md = document.getElementById('wbsPreview').textContent || 'WBS not generated yet.';
+      downloadData('WBS.md', md, 'text/markdown');
+    });
+
+    document.getElementById('downloadProcessDoc').addEventListener('click', () => {
+      const key = document.getElementById('scenarioSelect').value;
+      if(!key && Object.keys(state.scenarios).length === 0) {
+        alert('Please generate a process first.');
+        return;
+      }
+      
+      const template = key ? state.scenarios[key] : Object.values(state.scenarios)[0];
+      if (!template) {
+        alert('No scenario selected or generated.');
+        return;
+      }
+
+      const md = processTemplateToMarkdown(template);
+      downloadData(`${template.title.replace(/\W+/g,'_')}_ProcessDesign.md`, md, 'text/markdown;charset=utf-8');
+    });
+
+    document.getElementById('exportDiagram').addEventListener('click', () => {
+      let key = document.getElementById('scenarioSelect').value || Object.keys(state.scenarios)[0];
+      if(!key) {
+        key = Object.keys(SCENARIO_TEMPLATES)[0];
+      }
+      
+      const template = state.scenarios[key] || SCENARIO_TEMPLATES[key];
+      const svg = generatePhaseDiagramSVG(template, 1200, 160);
+      downloadData(`${template.title.replace(/\s+/g,'_')}_diagram.svg`, svg, 'image/svg+xml');
+    });
+
+    function processTemplateToMarkdown(template) {
+      let md = `# Process Design Document: ${template.title}\n\n`;
+      md += `## 1. Context & Rationale\n\n`;
+      md += `**Process Type:** ${template.processType}\n\n`;
+      md += `**Project Context:** ${template.context}\n\n`;
+      md += `**Tailoring Justification:** ${template.tailoringRationale}\n\n`;
+
+      md += `## 2. Process Phases & Details\n\n`;
+      
+      template.phases.forEach((p, i) => {
+        md += `### 2.${i+1} ${p.name}\n`;
+        md += `- **Key Activities:** ${p.activities.join('; ')}\n`;
+        md += `- **Roles:** ${(p.roles || []).join(', ')}\n`;
+        md += `- **Artifacts/Deliverables:** ${(p.artifacts || []).join('; ')}\n`;
+        md += `- **Decision Gates:** ${(p.gates || []).join('; ')}\n`;
+        md += `- **References:** ${(p.refs || []).join(', ')}\n\n`;
+      });
+
+      md += `## 3. Referenced Standards\n\n`;
+      const refs = buildReferenceList(template);
+      
+      if(refs.length){
+        refs.forEach(r => { md += `- ${r}\n`; });
+      } else {
+        md += `(No specific standards referenced in this template)\n`;
+      }
+
+      md += `\n---\n_This Process Design Document was produced by the PM Standards Explorer prototype. Tailor references with precise section numbers from your uploaded standards if required._\n`;
+      return md;
+    }
+
+    function buildReferenceList(template) {
+      const refs = new Set();
+      template.phases.forEach(p => {
+        (p.refs || []).forEach(r => {
+          refs.add(r);
+        });
+      });
+      return Array.from(refs);
+    }
+
+    function generatePhaseDiagramSVG(template, width=900, height=140) {
+      const phases = template.phases.map(p=>p.name);
+      const n = phases.length;
+      const padding = 20;
+      const boxW = Math.max(120, Math.floor((width - padding*2) / n) - 12);
+      const boxH = 48;
+      const gap = 8;
+      let x = padding;
+      const y = 30;
+      const svgParts = [];
+      
+      svgParts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`);
+      svgParts.push(`<style>text{font-family:Arial,Helvetica,sans-serif;font-size:12px;fill:#08224a;} .box{fill:#f7fbff;stroke:#cfe3ff;stroke-width:1.2;} .arrow{stroke:#cfe3ff;stroke-width:2;fill:none;}</style>`);
+      
+      for(let i=0;i<n;i++){
+        const px = x + (boxW+gap)*i;
+        svgParts.push(`<rect class="box" x="${px}" y="${y}" rx="8" ry="8" width="${boxW}" height="${boxH}"></rect>`);
+        const label = escapeHtml(phases[i]);
+        const words = label.split(' ');
+        let line1 = words.slice(0, Math.ceil(words.length/2)).join(' ');
+        let line2 = words.slice(Math.ceil(words.length/2)).join(' ');
+        svgParts.push(`<text x="${px + boxW/2}" y="${y + boxH/2 - 6}" text-anchor="middle">${line1}</text>`);
+        svgParts.push(`<text x="${px + boxW/2}" y="${y + boxH/2 + 12}" text-anchor="middle">${line2}</text>`);
+        
+        if(i < n-1){
+          const x1 = px + boxW;
+          const x2 = px + boxW + gap + 6;
+          const ay = y + boxH/2;
+          svgParts.push(`<path class="arrow" d="M ${x1+6} ${ay} L ${x1+gap+boxW-6} ${ay}" marker-end="url(#arrowhead)"></path>`);
+        }
+      }
+      
+      svgParts.push(`<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#cfe3ff"/></marker></defs>`);
+      svgParts.push('</svg>');
+      return svgParts.join('');
+    }
+
+    // ========== README Export ==========
+    document.getElementById('exportReadme').addEventListener('click', () => {
+      const gh = localStorage.getItem('pm_explorer_github_link') || '(not set)';
+      const md = `# PM Standards Explorer — Assignment 1\n\n**Project:** Comparative Analysis and Process Design using PM Standards Context\n\n**Authors:** Group of 3\n\n**Repository:** ${gh}\n\n## What this prototype delivers\n\n- Standards repository with upload, PDF/text parsing, and indexing.\n- Full-text search across uploaded standards using ElasticLunr.\n- Document viewer with navigation, bookmarking, and highlighting.\n- Deep links to documents and pages, with precise snippet highlighting (query + character range).\n- Bookmarking (store/open/export/import) with highlight preservation.\n- Side-by-side comparison engine (Set as A / Set as B) that highlights common phrases and shows unique terms.\n- Insights panel summarizing similarities, differences, and unique points.\n- WBS generator and Markdown export.\n- Phase 2: scenario templates (Custom Software, Innovative Product, Large Government) with phases, activities, roles, artifacts, gates, and export.\n\n_Push this file and your uploaded standards into the GitHub repo for instructor review._\n`;
+      downloadData('README_Assignment1.md', md, 'text/markdown');
+    });
+
+    // ========== GitHub Link ==========
+    const GITHUB_KEY = 'pm_explorer_github_link';
+    document.getElementById('githubLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      const current = localStorage.getItem(GITHUB_KEY) || '';
+      const link = prompt('Enter your GitHub repository link:', current);
+      if(link){
+        localStorage.setItem(GITHUB_KEY, link);
+        alert('GitHub repository link saved!');
+      }
+    });
+
+    // ========== Initialize Application ==========
+    document.getElementById('fileInput').addEventListener('change', (e) => handleFiles(e.target.files));
+    
+    // Set up export page button redirects
+    document.querySelectorAll('#exportPage button').forEach(btn => {
+      const id = btn.id;
+      if (id && id !== 'exportReadme2') {
+        const originalId = id.replace('2', '');
+        btn.addEventListener('click', () => {
+          document.getElementById(originalId).click();
+        });
+      }
+    });
+    
+    document.getElementById('exportReadme2').addEventListener('click', () => {
+      document.getElementById('exportReadme').click();
+    });
+
+    // Initialize bookmarks
+    renderBookmarks();
+  </script>
+</body>
+</html>
