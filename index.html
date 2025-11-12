@@ -643,7 +643,6 @@
       color: var(--text-secondary);
       font-size: 14px;
     }
-    
   </style>
 </head>
 <body>
@@ -709,5 +708,798 @@
         </a>
       </div>
     </nav>
+    
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Top Bar -->
+      <header class="top-bar">
+        <h1 class="page-title" id="currentPageTitle">Dashboard</h1>
+        <div class="user-actions">
+          <button class="btn btn-outline" id="exportReadme">Export README</button>
+          <button class="btn btn-primary" id="downloadWBS">Download WBS</button>
+        </div>
+      </header>
+      
+      <!-- Page Content -->
+      <div class="page-content">
+        <!-- Dashboard Page -->
+        <div class="page active" id="dashboard">
+          <div class="welcome-hero">
+            <h1 class="welcome-title">PM Standards Explorer</h1>
+            <p class="welcome-subtitle">A comprehensive tool for comparing project management standards, generating processes, and tailoring methodologies to your specific needs.</p>
+            <div class="d-flex justify-center gap-2">
+              <button class="btn btn-primary" data-page="repository" style="margin-left: 350px;">Get Started</button>
+              <button class="btn btn-outline" data-page="scenarios">Explore Scenarios</button>
+            </div>
+          </div>
+          
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value" id="docCount">0</div>
+              <div class="stat-label">Standards Uploaded</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="bookmarkCount">0</div>
+              <div class="stat-label">Bookmarks</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">3</div>
+              <div class="stat-label">Scenario Templates</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value" id="searchCount">0</div>
+              <div class="stat-label">Search Results</div>
+            </div>
+          </div>
+          
+          <div class="grid grid-3">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">📁 Repository</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted">Upload and manage your PM standards documents (PDF, TXT, HTML).</p>
+                <button class="btn btn-primary mt-2" data-page="repository">Manage Documents</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">📖 Document Viewer</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted">Read and navigate through your uploaded documents with full functionality.</p>
+                <button class="btn btn-primary mt-2" data-page="viewer">View Documents</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">🔍 Search</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted">Search across all uploaded standards with advanced filtering.</p>
+                <button class="btn btn-primary mt-2" data-page="search">Search Standards</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">⚖️ Compare</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted">Compare standards side-by-side and identify similarities and differences.</p>
+                <button class="btn btn-primary mt-2" data-page="compare">Start Comparison</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">🛠️ Process Generator</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted">Generate custom WBS and process flows based on your project needs.</p>
+                <button class="btn btn-primary mt-2" data-page="process">Generate Process</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">🎯 Scenarios</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted">Explore tailored processes for different project scenarios.</p>
+                <button class="btn btn-primary mt-2" data-page="scenarios">View Scenarios</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Repository Page -->
+        <div class="page" id="repository">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">📁 Standards Repository</h2>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Upload Standards Documents</label>
+                <input type="file" id="fileInput" class="form-control" multiple accept=".pdf,.txt,.html,.htm,text/plain">
+                <div class="text-muted mt-1">Supported formats: PDF, TXT, HTML</div>
+              </div>
+              
+              <div class="mt-3">
+                <h3 class="text-primary mb-2">Uploaded Documents</h3>
+                <div id="fileList" class="search-results">
+                  <div class="text-muted text-center py-4">No documents uploaded yet</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Document Viewer Page -->
+        <div class="page" id="viewer">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">📖 Document Viewer</h2>
+            </div>
+            <div class="card-body">
+              <div class="viewer-controls">
+                <div class="form-group" style="flex: 1; min-width: 200px;">
+                  <select id="docSelect" class="form-control">
+                    <option value="">-- Select a document --</option>
+                  </select>
+                </div>
+                
+                <div class="viewer-nav">
+                  <button class="btn btn-outline" id="prevPage" title="Previous Page">← Prev</button>
+                  <div class="page-indicator" id="currentPage">- / -</div>
+                  <button class="btn btn-outline" id="nextPage" title="Next Page">Next →</button>
+                </div>
+                
+                <div class="d-flex gap-2">
+                  <button class="btn btn-outline" id="bookmarkBtn" title="Bookmark this page">⭐ Bookmark</button>
+                  <button class="btn btn-outline" id="copyDeepLink" title="Copy link to this view">🔗 Copy Link</button>
+                </div>
+              </div>
+              
+              <div id="bookContent" class="viewer-container" style="height: 600px;">
+                <div class="text-muted text-center py-4">
+                  Select a document from the dropdown to start reading
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Search Page -->
+        <div class="page" id="search">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">🔍 Search Across Standards</h2>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <div class="d-flex gap-2">
+                  <input type="text" id="searchBox" class="form-control" placeholder="Search for risk management, stakeholder analysis, etc.">
+                  <button class="btn btn-primary" id="searchBtn">Search</button>
+                </div>
+              </div>
+              
+              <div class="mt-3">
+                <h3 class="text-primary mb-2">Search Results</h3>
+                <div id="searchResults" class="search-results">
+                  <div class="text-muted text-center py-4">Enter a search term to find content across your standards</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Compare Page -->
+        <div class="page" id="compare">
+          <div class="grid grid-2">
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">⚖️ Document Comparison</h2>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label class="form-label">Select Content for Comparison</label>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-secondary" id="setA">Set as A</button>
+                    <button class="btn btn-secondary" id="setB">Set as B</button>
+                    <button class="btn btn-primary" id="compareBtn">Compare</button>
+                  </div>
+                  <div id="selectionPreview" class="mt-2 text-sm"></div>
+                </div>
+                
+                <div class="comparison-container mt-3">
+                  <div class="comparison-box" id="compareA">
+                    <div class="text-muted">A — Select content from a document or search result</div>
+                  </div>
+                  <div class="comparison-box" id="compareB">
+                    <div class="text-muted">B — Select content from a document or search result</div>
+                  </div>
+                </div>
+                
+                <div class="mt-2">
+                  <button class="btn btn-outline" id="openCompareLink">Open Comparison Source</button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">💡 Insights</h2>
+              </div>
+              <div class="card-body">
+                <div id="insightsPanel" class="viewer-container" style="height: 300px;">
+                  <div class="text-muted">Compare documents A and B to see insights about similarities and differences</div>
+                </div>
+                <div class="d-flex gap-2 mt-2">
+                  <button class="btn btn-primary" id="computeInsights">Compute Insights</button>
+                  <button class="btn btn-secondary" id="exportInsights">Export Insights</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Process Generator Page -->
+        <div class="page" id="process">
+          <div class="grid grid-2">
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">🛠️ Process & WBS Generator</h2>
+              </div>
+              <div class="card-body">
+                <div class="form-group">
+                  <label class="form-label">Project Name</label>
+                  <input type="text" id="projectName" class="form-control" placeholder="e.g., Mobile App Upgrade">
+                </div>
+                
+                <div class="d-flex gap-2">
+                  <button class="btn btn-primary" id="generateProcess">Generate Process</button>
+                  <button class="btn btn-secondary" id="downloadProcess">Download Process</button>
+                </div>
+                
+                <div class="mt-3">
+                  <h3 class="text-primary mb-2">Process Output</h3>
+                  <div id="processOutput" class="text-muted">
+                    Generate a process to see the output here
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h2 class="card-title">🪜 WBS Preview</h2>
+              </div>
+              <div class="card-body">
+                <div id="wbsPreview" class="viewer-container">
+                  <div class="text-muted">A WBS will be generated from your process</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Scenarios Page -->
+        <div class="page" id="scenarios">
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">🎯 Scenario-Based Process Tailoring</h2>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Select Project Scenario</label>
+                <select id="scenarioSelect" class="form-control">
+                  <option value="">Select a scenario</option>
+                  <option value="software">Custom Software Development (Agile-lite)</option>
+                  <option value="innovation">Innovative Product Development (R&D, Stage-Gate)</option>
+                  <option value="government">Large Government Project (Predictive, High Governance)</option>
+                </select>
+              </div>
+              
+              <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-primary" id="generateScenarioProcess">Generate Tailored Process</button>
+                <button class="btn btn-secondary" id="generateAllScenarios">Generate All 3</button>
+                <button class="btn btn-secondary" id="downloadProcessDoc">Download Document</button>
+                <button class="btn btn-secondary" id="exportDiagram">Export Diagram (SVG)</button>
+              </div>
+              
+              <div class="mt-3">
+                <h3 class="text-primary mb-2">Scenario Output</h3>
+                <div id="scenarioOutput" class="text-muted">
+                  Select a scenario and generate a process to see the output
+                </div>
+              </div>
+              
+              <div class="mt-3">
+                <h3 class="text-primary mb-2">Scenario Details</h3>
+                <div id="phase2Details" class="viewer-container">
+                  <div class="text-muted">Generate a scenario to see process details, justification, and references</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Bookmarks Page -->
+        <div class="page" id="bookmarks">
+          <div class="card">
+            <div class="card-header d-flex justify-between align-center">
+              <h2 class="card-title">⭐ Bookmarks & Saved Views</h2>
+              <div class="d-flex gap-2">
+                <button class="btn btn-secondary" id="exportBookmarks">Export</button>
+                <button class="btn btn-secondary" id="importBookmarks">Import</button>
+                <button class="btn btn-outline" id="clearBookmarks">Clear All</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div id="bookmarksList" class="search-results">
+                <div class="text-muted text-center py-4">No bookmarks saved yet</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Export Page -->
+        <div class="page" id="export">
+          <div class="grid grid-3">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">📄 Documents</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted mb-2">Export your process documents and WBS</p>
+                <button class="btn btn-primary" id="downloadWBS2">Download WBS</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">📊 Insights</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted mb-2">Export comparison insights and analysis</p>
+                <button class="btn btn-primary" id="exportInsights2">Export Insights</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">⭐ Bookmarks</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted mb-2">Export your saved bookmarks</p>
+                <button class="btn btn-primary" id="exportBookmarks2">Export Bookmarks</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">🛠️ Processes</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted mb-2">Export generated processes</p>
+                <button class="btn btn-primary" id="downloadProcess2">Download Process</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">🎯 Scenarios</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted mb-2">Export scenario documents and diagrams</p>
+                <button class="btn btn-primary" id="downloadProcessDoc2">Download Document</button>
+                <button class="btn btn-primary mt-1" id="exportDiagram2">Export Diagram</button>
+              </div>
+            </div>
+            
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">📋 README</h3>
+              </div>
+              <div class="card-body">
+                <p class="text-muted mb-2">Export assignment README</p>
+                <button class="btn btn-primary" id="exportReadme2">Export README</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
   </div>
-</body>
+
+  <script>
+    // ========== Application State and Core Functionality ==========
+    // All original functionality is preserved - only UI has been redesigned
+    
+    const state = {
+      docs: {},
+      index: null,
+      selectedA: null,
+      selectedB: null,
+      bookmarksKey: 'pm_explorer_bookmarks_v1',
+      scenarios: {},
+      lastScenarioAction: 'none',
+      currentDocId: null,
+      currentPageIndex: 1
+    };
+
+    // Initialize search index
+    function createIndex() {
+      const idx = elasticlunr(function() {
+        this.addField('title');
+        this.addField('body');
+        this.setRef('id');
+      });
+      state.index = idx;
+    }
+    createIndex();
+
+    // PDF.js setup
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.worker.min.js';
+
+    // Utility functions
+    function uid(prefix='d') { return prefix + '_' + Math.random().toString(36).slice(2,9); }
+    function escapeHtml(s) { if(!s) return ''; return s.replace(/[&<>"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function short(s, n=160){ if(!s) return ''; return s.length>n? s.slice(0,n-1)+'…': s; }
+
+    // ========== Page Navigation ==========
+    document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+      item.addEventListener('click', function(e) {
+        e.preventDefault();
+        const pageId = this.getAttribute('data-page');
+        
+        // Update active nav item
+        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Update page title
+        const pageTitle = document.getElementById('currentPageTitle');
+        pageTitle.textContent = this.querySelector('.nav-text').textContent;
+        
+        // Show selected page
+        document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        
+        // Special handling for viewer page
+        if (pageId === 'viewer') {
+          refreshDocSelect();
+        }
+      });
+    });
+
+    // Dashboard buttons navigation
+    document.querySelectorAll('button[data-page]').forEach(button => {
+      button.addEventListener('click', function() {
+        const pageId = this.getAttribute('data-page');
+        
+        // Update active nav item
+        document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+        document.querySelector(`.nav-item[data-page="${pageId}"]`).classList.add('active');
+        
+        // Update page title
+        const pageTitle = document.getElementById('currentPageTitle');
+        pageTitle.textContent = document.querySelector(`.nav-item[data-page="${pageId}"] .nav-text`).textContent;
+        
+        // Show selected page
+        document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+        document.getElementById(pageId).classList.add('active');
+        
+        // Special handling for viewer page
+        if (pageId === 'viewer') {
+          refreshDocSelect();
+        }
+      });
+    });
+
+    // ========== File Handling and Indexing ==========
+    async function handleFiles(files) {
+      for (const f of Array.from(files)) {
+        const ext = f.name.split('.').pop().toLowerCase();
+        const docId = uid(f.name.replace(/\W+/g,'_'));
+        const doc = { id: docId, name: f.name, type: ext, pages: [], file: f };
+        state.docs[docId] = doc;
+
+        if (ext === 'pdf') {
+          const arrayBuf = await f.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({data: arrayBuf}).promise;
+          for (let p=1;p<=pdf.numPages;p++){
+            const page = await pdf.getPage(p);
+            const txt = await page.getTextContent();
+            const pageText = txt.items.map(i => i.str).join(' ');
+            doc.pages.push({ page: p, text: pageText });
+            state.index.addDoc({ id: `${docId}_p${p}`, title: `${f.name} — page ${p}`, body: pageText, docId, page: p });
+          }
+        } else if (ext === 'txt' || ext === 'html' || ext === 'htm') {
+          const text = await f.text();
+          const chunks = chunkText(text, 800);
+          chunks.forEach((c, i) => {
+            const p = i+1;
+            doc.pages.push({ page: p, text: c });
+            state.index.addDoc({ id: `${docId}_p${p}`, title: `${f.name} — page ${p}`, body: c, docId, page: p });
+          });
+        } else {
+          const text = await f.text().catch(()=>'');
+          doc.pages.push({ page: 1, text: text || `[Unable to extract text for ${f.name}]` });
+          state.index.addDoc({ id: `${docId}_p1`, title: `${f.name} — page 1`, body: doc.pages[0].text, docId, page: 1 });
+        }
+      }
+      refreshDocList();
+      refreshDocSelect();
+      updateStats();
+    }
+
+    function chunkText(text, wordsPerChunk=800) {
+      if (!text) return [''];
+      const words = text.split(/\s+/);
+      const out = [];
+      for (let i=0;i<words.length;i+=wordsPerChunk) {
+        out.push(words.slice(i,i+wordsPerChunk).join(' ').trim());
+      }
+      if(out.length===0) out.push(text);
+      return out;
+    }
+
+    // ========== Document Viewer Functionality ==========
+    function refreshDocSelect() {
+      const select = document.getElementById('docSelect');
+      select.innerHTML = '<option value="">-- Select a document --</option>';
+      
+      Object.keys(state.docs).forEach(id => {
+        const d = state.docs[id];
+        const opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = d.name;
+        select.appendChild(opt);
+      });
+    }
+
+    function openDoc(docId, page=1, highlightObj=null) {
+      const doc = state.docs[docId];
+      if(!doc) return;
+      
+      state.currentDocId = docId;
+      state.currentPageIndex = Math.max(1, Math.min(page, doc.pages.length));
+      
+      document.getElementById('currentPage').textContent = `${state.currentPageIndex} / ${doc.pages.length}`;
+      document.getElementById('docSelect').value = docId;
+      
+      renderPageContent(docId, state.currentPageIndex, highlightObj);
+    }
+
+    function renderPageContent(docId, pageNum, highlightObj=null) {
+      const doc = state.docs[docId];
+      if(!doc) return;
+      
+      const page = doc.pages.find(p=>p.page===pageNum);
+      const el = document.getElementById('bookContent');
+      
+      if(!page) { 
+        el.innerHTML = '<div class="text-muted text-center py-4">[page not found]</div>'; 
+        return; 
+      }
+      
+      let text = page.text || '[no text extracted]';
+      
+      if(highlightObj && highlightObj.q) {
+        let start = typeof highlightObj.start === 'number' ? highlightObj.start : text.toLowerCase().indexOf(highlightObj.q.toLowerCase());
+        if(start < 0) start = null;
+        
+        if(start !== null) {
+          const end = typeof highlightObj.end === 'number' ? highlightObj.end : (start + highlightObj.q.length);
+          const snipStart = Math.max(0, start - 300);
+          const snipEnd = Math.min(text.length, end + 300);
+          const snippet = text.slice(snipStart, snipEnd);
+          const relStart = start - snipStart;
+          const before = escapeHtml(snippet.slice(0, relStart));
+          const mid = escapeHtml(snippet.slice(relStart, relStart + (end-start)));
+          const after = escapeHtml(snippet.slice(relStart + (end-start)));
+          
+          el.innerHTML = before + `<mark>${mid}</mark>` + after;
+          return;
+        } else {
+          const idx = text.toLowerCase().indexOf(highlightObj.q.toLowerCase());
+          if(idx>=0){
+            const start2 = Math.max(0, idx-80);
+            const end2 = Math.min(text.length, idx + highlightObj.q.length + 80);
+            const snippet = text.slice(start2, end2);
+            const marked = snippet.replace(new RegExp(escapeRegExp(highlightObj.q),'i'), m=>`<mark>${escapeHtml(m)}</mark>`);
+            el.innerHTML = marked;
+            return;
+          }
+        }
+      }
+      
+      el.textContent = text;
+    }
+
+    function escapeRegExp(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+
+    // Document viewer event listeners
+    document.getElementById('docSelect').addEventListener('change', (e) => {
+      if(e.target.value) {
+        openDoc(e.target.value, 1);
+      }
+    });
+
+    document.getElementById('prevPage').addEventListener('click', () => {
+      if(!state.currentDocId) return;
+      openDoc(state.currentDocId, state.currentPageIndex - 1);
+    });
+
+    document.getElementById('nextPage').addEventListener('click', () => {
+      if(!state.currentDocId) return;
+      openDoc(state.currentDocId, state.currentPageIndex + 1);
+    });
+
+    // ========== UI Updates ==========
+    function refreshDocList() {
+      const fileList = document.getElementById('fileList');
+      fileList.innerHTML = '';
+      
+      const keys = Object.keys(state.docs);
+      if (keys.length === 0) {
+        fileList.innerHTML = '<div class="text-muted text-center py-4">No documents uploaded yet</div>';
+        return;
+      }
+      
+      keys.forEach(id => {
+        const d = state.docs[id];
+        const div = document.createElement('div');
+        div.className = 'result-item';
+        div.innerHTML = `
+          <div class="result-title">${escapeHtml(d.name)}</div>
+          <div class="result-meta">${d.pages.length} pages • ${d.type.toUpperCase()}</div>
+          <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-outline" data-doc="${id}" data-action="view">View</button>
+            <button class="btn btn-outline" data-doc="${id}" data-action="setA">Set as A</button>
+            <button class="btn btn-outline" data-doc="${id}" data-action="setB">Set as B</button>
+          </div>
+        `;
+        fileList.appendChild(div);
+      });
+
+      // Add event listeners to buttons
+      fileList.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const docId = this.getAttribute('data-doc');
+          const action = this.getAttribute('data-action');
+          
+          if (action === 'setA') {
+            setSelectionA({docId, pageNum: 1, excerpt: state.docs[docId].pages[0].text.slice(0, 300)});
+          } else if (action === 'setB') {
+            setSelectionB({docId, pageNum: 1, excerpt: state.docs[docId].pages[0].text.slice(0, 300)});
+          } else if (action === 'view') {
+            // Navigate to viewer page and open the document
+            document.querySelector('.nav-item[data-page="viewer"]').click();
+            openDoc(docId, 1);
+          }
+        });
+      });
+      
+      updateStats();
+    }
+
+    function updateStats() {
+      document.getElementById('docCount').textContent = Object.keys(state.docs).length;
+      
+      const bookmarks = loadBookmarks();
+      document.getElementById('bookmarkCount').textContent = bookmarks.length;
+    }
+
+    // ========== Search Functionality ==========
+    document.getElementById('searchBtn').addEventListener('click', doSearch);
+    document.getElementById('searchBox').addEventListener('keydown', (e) => { 
+      if(e.key === 'Enter') doSearch(); 
+    });
+
+    function doSearch(){
+      const q = document.getElementById('searchBox').value.trim();
+      const resDiv = document.getElementById('searchResults');
+      resDiv.innerHTML = '';
+      
+      if(!q){ 
+        resDiv.innerHTML = '<div class="text-muted text-center py-4">Enter a search term to find content across your standards</div>'; 
+        return; 
+      }
+
+      let results = [];
+      try {
+        results = state.index.search(q, {
+          fields: {
+            title: { boost: 2 },
+            body: { boost: 1 }
+          },
+          expand: true
+        }).slice(0, 80);
+      } catch(e){
+        console.warn('elasticlunr search error', e);
+        results = [];
+      }
+
+      if(!results || results.length === 0){
+        const hits = [];
+        const docs = state.index.documentStore.docs || {};
+        for(const ref of Object.keys(docs)){
+          const docRecord = state.index.documentStore.getDoc(ref);
+          const body = (docRecord && docRecord.body) ? docRecord.body : '';
+          if(body.toLowerCase().includes(q.toLowerCase())){
+            hits.push({ ref, score: 0.1 });
+          }
+        }
+        results = hits.slice(0,80);
+      }
+
+      if(!results || results.length === 0){
+        resDiv.innerHTML = '<div class="text-muted text-center py-4">No results found</div>';
+        return;
+      }
+
+      document.getElementById('searchCount').textContent = results.length;
+
+      results.forEach(r => {
+        const ref = r.ref;
+        const docRecord = state.index.documentStore.getDoc(ref) || {};
+        let docId = docRecord.docId;
+        let pageNum = docRecord.page;
+        
+        if(!docId || !pageNum) {
+          const m = ref.match(/^(.*)_p(\d+)$/);
+          if(m) {
+            docId = docId || m[1];
+            pageNum = pageNum || parseInt(m[2], 10);
+          } else {
+            docId = docId || ref;
+            pageNum = pageNum || 1;
+          }
+        }
+
+        const doc = state.docs[docId];
+        const page = doc ? doc.pages.find(p=>p.page===pageNum) : null;
+        const text = page ? page.text : '';
+        const snippet = findSnippet(text, q);
+        
+        const row = document.createElement('div');
+        row.className = 'result-item';
+        row.innerHTML = `
+          <div class="result-title">${escapeHtml(doc ? doc.name : docId)}</div>
+          <div class="result-meta">Page ${pageNum} • Score: ${r.score ? (typeof r.score === 'number' ? r.score.toFixed(2) : r.score) : '—'}</div>
+          <div class="result-snippet">${escapeHtml(snippet)}</div>
+          <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-outline" data-doc="${docId}" data-page="${pageNum}" data-q="${escapeHtml(q)}">View</button>
+            <button class="btn btn-outline" data-doc="${docId}" data-page="${pageNum}" data-q="${escapeHtml(q)}" data-action="setA">Set as A</button>
+            <button class="btn btn-outline" data-doc="${docId}" data-page="${pageNum}" data-q="${escapeHtml(q)}" data-action="setB">Set as B</button>
+          </div>
+        `;
+        resDiv.appendChild(row);
+      });
+
+      // Add event listeners to result buttons
+      resDiv.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', e => {
+          const docId = e.target.getAttribute('data-doc');
+          const pageNum = parseInt(e.target.getAttribute('data-page'), 10);
+          const q = e.target.getAttribute('data-q');
+          const action = e.target.getAttribute('data-action');
+          
+          if(action === 'setA') {
+            setSelectionA({docId, pageNum, excerpt: q, q});
+          } else if(action === 'setB') {
+            setSelectionB({docId, pageNum, excerpt: q, q});
+          } else {
+            // Navigate to viewer and open the document with highlight
+            document.querySelector('.nav-item[data-page="viewer"]').click();
+            openDoc(docId, pageNum, {q});
+          }
+        });
+      });
+    }
